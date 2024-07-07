@@ -2,8 +2,8 @@
 pkgname = "gcc"
 _clangver = "18"
 _mver = "11"
-_mnver = f"{_mver}.2"
-_bver = f"{_mnver}.1"
+_mnver = f"{_mver}.4"
+_bver = f"{_mnver}.0"
 _datever = "20231014"
 pkgver = f"{_bver}_git{_datever}"
 pkgrel = 0
@@ -88,8 +88,8 @@ pkgdesc = "GNU Compiler Collection"
 maintainer = "q66 <q66@chimera-linux.org>"
 license = "GPL-3.0-or-later"
 url = "https://gcc.gnu.org"
-source = f"https://dev.alpinelinux.org/archive/gcc/{_mver}-{_datever}/gcc-{_mver}-{_datever}.tar.xz"
-sha256 = "40bf42e54cefefa4a8f35c48e0f290c9ef8118eee9a72800296a0e620dfb0240"
+source = f"https://ftp.gnu.org/gnu/gcc/gcc-{_bver}.tar.xz"
+sha256 = "3f2db222b007e8a4a23cd5ba56726ef08e8b1f1eb2055ee72c1402cea73a8dd9"
 hardening = ["!int", "!format", "!var-init"]
 # no tests to run
 options = ["!check", "!lto", "!relr", "!cross", "!scanshlibs"]
