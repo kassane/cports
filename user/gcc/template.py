@@ -1,7 +1,7 @@
 # rebuild on major clang version updates
 pkgname = "gcc"
 _clangver = "18"
-_mver = "13"
+_mver = "11"
 _mnver = f"{_mver}.2"
 _bver = f"{_mnver}.1"
 _datever = "20231014"
@@ -36,7 +36,7 @@ configure_args = [
     "--enable-default-pie",
     "--enable-default-ssp",
     # more languages later
-    "--enable-languages=c,c++,objc,fortran",
+    "--enable-languages=c,c++,d,objc,fortran",
     "--enable-linker-build-id",
     "--enable-plugins",
     "--enable-shared",
@@ -54,6 +54,8 @@ configure_args = [
     "--with-linker-hash-style=gnu",
     f"--with-gxx-include-dir=/usr/include/c++/{_bver}",
     "--with-gxx-libcxx-include-dir=/usr/include/c++/v1",
+    "--enable-libphobos",
+    "--with-libphobos-druntime-only",
     "libat_cv_have_ifunc=no",
 ]
 configure_gen = []
