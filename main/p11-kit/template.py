@@ -1,5 +1,5 @@
 pkgname = "p11-kit"
-pkgver = "0.25.4"
+pkgver = "0.25.5"
 pkgrel = 0
 build_style = "meson"
 configure_args = [
@@ -27,16 +27,13 @@ maintainer = "q66 <q66@chimera-linux.org>"
 license = "BSD-3-Clause"
 url = "https://github.com/p11-glue/p11-kit"
 source = f"{url}/releases/download/{pkgver}/{pkgname}-{pkgver}.tar.xz"
-sha256 = "4c4153f81167444ff6d5e7ca118472ae607bd25c0cf6346fcc5dcc30451e97ce"
+sha256 = "04d0a86450cdb1be018f26af6699857171a188ac6d5b8c90786a60854e1198e5"
 
 
 def post_install(self):
     self.install_license("COPYING")
 
-    self.mv(
-        self.destdir / "etc/pkcs11/pkcs11.conf.example",
-        self.destdir / "etc/pkcs11/pkcs11.conf",
-    )
+    self.rename("etc/pkcs11/pkcs11.conf.example", "pkcs11.conf")
 
 
 @subpackage("p11-kit-devel")

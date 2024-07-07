@@ -1,7 +1,7 @@
 pkgname = "php8.3"
 _majver = "8.3"
-pkgver = f"{_majver}.8"
-pkgrel = 3
+pkgver = f"{_majver}.9"
+pkgrel = 0
 _apiver = "20230831"
 build_style = "gnu_configure"
 configure_args = [
@@ -122,7 +122,7 @@ maintainer = "Renato Botelho do Couto <renato@netgate.com>"
 license = "PHP-3.01"
 url = "https://www.php.net"
 source = f"{url}/distributions/php-{pkgver}.tar.gz"
-sha256 = "0ebed9f1471871cf131e504629f3947f2acd38a655cc31b036f99efd0e3dbdeb"
+sha256 = "f484dec6ee005c83f899af02fc021e1bc3b1d7b3f143ca062ef66b0fcee96566"
 
 
 def post_patch(self):
@@ -203,8 +203,17 @@ def post_patch(self):
         "ext/simplexml/tests/bug79971_1.phpt",
         "ext/soap/tests/bug69668.phpt",
         "ext/soap/tests/bugs/bug42151.phpt",
+        # probably fails because of zlib-ng-compat
+        "ext/zlib/tests/bug48725.phpt",
+        # most of these try connect to an ldap server and wait for timeout then autoskip
+        "ext/ldap/tests/*.phpt",
     ]:
-        self.rm(f)
+        self.rm(f, glob=True)
+
+
+def init_check(self):
+    # injected via patch
+    self.make_check_args += [f"PHP_RUN_TESTS_ARGS=-j{self.make_jobs}"]
 
 
 def init_install(self):
@@ -218,15 +227,12 @@ def post_install(self):
     self.install_file("README.md", f"usr/share/doc/php{_majver}")
     self.install_service(self.files_path / f"php-fpm{_majver}")
     # default php-fpm config files
-    self.mv(
-        self.destdir / f"etc/php{_majver}/php-fpm.conf.default",
-        self.destdir / f"etc/php{_majver}/php-fpm.conf",
-    )
+    self.mv(f"etc/php{_majver}/php-fpm.conf.default", "php-fpm.conf")
     self.install_file(
         self.files_path / "www.conf", f"etc/php{_majver}/php-fpm.d"
     )
     # these are unnecessary with apk backups
-    self.rm(self.destdir / f"etc/php{_majver}/php-fpm.d/*.default", glob=True)
+    self.uninstall(f"etc/php{_majver}/php-fpm.d/*.default")
     # extensions
     extcp = self.destdir / f"etc/php{_majver}/conf.d"
     self.mkdir(extcp, parents=True)

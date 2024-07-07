@@ -1,6 +1,6 @@
 pkgname = "qemu-user"
 pkgver = "9.0.1"
-pkgrel = 0
+pkgrel = 1
 build_style = "gnu_configure"
 # TODO vde libssh capstone
 configure_args = [
@@ -51,7 +51,7 @@ exec_wrappers = [("/usr/bin/ugetopt", "getopt")]
 
 
 def post_install(self):
-    self.rm(self.destdir / "usr/share", recursive=True)
+    self.uninstall("usr/share")
     self.install_dir("usr/lib/binfmt.d")
 
     self.do(

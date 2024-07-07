@@ -1,6 +1,6 @@
 pkgname = "plasma-workspace"
-pkgver = "6.1.1"
-pkgrel = 1
+pkgver = "6.1.2"
+pkgrel = 0
 build_style = "cmake"
 # TODO: -DINSTALL_SDDM_WAYLAND_SESSION=ON experiments?
 configure_args = ["-DGLIBC_LOCALE_GEN=OFF"]
@@ -123,7 +123,7 @@ maintainer = "Jami Kettunen <jami.kettunen@protonmail.com>"
 license = "MIT AND GPL-3.0-only AND LGPL-3.0-only"
 url = "https://api.kde.org/plasma/plasma-workspace/html"
 source = f"$(KDE_SITE)/plasma/{pkgver}/plasma-workspace-{pkgver}.tar.xz"
-sha256 = "47d2c42bdf8c127fa1656f65baa9828f9890cffd3f416b0af9e056cf228c07ee"
+sha256 = "47f019b92dca868e65e5507ffa83d0d974adf18e895caa136256108cc02a659a"
 # FIXME: cfi breaks at least 3 tests
 hardening = ["vis", "!cfi"]
 
@@ -139,29 +139,11 @@ def post_install(self):
 
     for theme in ["breeze", "breezedark", "breezetwilight"]:
         previews_path = f"usr/share/plasma/look-and-feel/org.kde.{theme}.desktop/contents/previews"
-        self.rm(self.destdir / f"{previews_path}/*", glob=True)
+        self.uninstall(f"{previews_path}/*", glob=True)
 
-    self.rm(self.destdir / "usr/lib/systemd/user", recursive=True)
+    self.uninstall("usr/lib/systemd/user")
 
 
 @subpackage("plasma-workspace-devel")
 def _devel(self):
-    self.pkgdesc = f"{pkgdesc} (development files)"
-    self.depends += [
-        "kitemmodels-devel",
-        "libplasma-devel",
-        "qt6-qtbase-devel",
-        "qt6-qtdeclarative-devel",
-    ]
-    # libkrdb.so unversined, avoid plasma-workspace pulling in plasma-workspace-devel
-    return [
-        "usr/include",
-        "usr/lib/libcolorcorrect.so",
-        "usr/lib/libkfontinst*.so",
-        "usr/lib/libkmpris.so",
-        "usr/lib/libkworkspace6.so",
-        "usr/lib/libnotificationmanager.so",
-        "usr/lib/libtaskmanager.so",
-        "usr/lib/libweather_ion.so",
-        "usr/lib/cmake",
-    ]
+    return self.default_devel()

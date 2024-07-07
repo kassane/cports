@@ -34,21 +34,14 @@ if self.profile().wordsize == 64:
 
 
 def post_install(self):
-    self.rm(self.destdir / "usr/bin", recursive=True)
-    self.rm(self.destdir / "usr/include/nspr/md", recursive=True)
+    self.uninstall("usr/bin")
+    self.uninstall("usr/include/nspr/md")
 
 
 @subpackage("nspr-devel")
 def _devel(self):
     self.depends += [f"{pkgname}={pkgver}-r{pkgrel}"]
-
-    # can't use default_devel, .so is not a symlink
-    return [
-        "usr/include",
-        "usr/lib/pkgconfig",
-        "usr/share/aclocal",
-        "usr/lib/*.a",
-    ]
+    return self.default_devel()
 
 
 configure_gen = []

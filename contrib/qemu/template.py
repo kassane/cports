@@ -1,19 +1,21 @@
 pkgname = "qemu"
 pkgver = "9.0.1"
-pkgrel = 0
+pkgrel = 1
 build_style = "gnu_configure"
 # TODO vde
 configure_args = [
+    "--enable-bpf",
     "--enable-cap-ng",
     "--enable-capstone",
     "--enable-curl",
     "--enable-curses",
     "--enable-dbus-display",
     "--enable-docs",
+    "--enable-gtk",
     "--enable-guest-agent",
     "--enable-jack",
-    "--enable-gtk",
     "--enable-kvm",
+    "--enable-libdw",
     "--enable-libnfs",
     "--enable-libssh",
     "--enable-linux-aio",
@@ -25,18 +27,19 @@ configure_args = [
     "--enable-seccomp",
     "--enable-snappy",
     "--enable-system",
-    "--enable-vhost-net",
-    "--enable-virtfs",
     "--enable-tpm",
     "--enable-usb-redir",
+    "--enable-vhost-net",
     "--enable-virglrenderer",
+    "--enable-virtfs",
     "--enable-vnc",
     "--enable-vnc-jpeg",
     "--enable-zstd",
-    "--disable-linux-user",
-    "--disable-glusterfs",
-    "--disable-debug-info",
     "--disable-bsd-user",
+    "--disable-debug-info",
+    "--disable-glusterfs",
+    "--disable-linux-user",
+    "--disable-oss",
     "--disable-werror",
     "--disable-xen",
     "--audio-drv-list=pa,pipewire,jack,sdl",
@@ -60,11 +63,13 @@ makedepends = [
     "bzip2-devel",
     "capstone-devel",
     "dtc-devel",
+    "elfutils-devel",
     "fuse-devel",
     "glib-devel",
     "gnutls-devel",
     "gtk+3-devel",
     "libaio-devel",
+    "libbpf-devel",
     "libcacard-devel",
     "libcap-ng-devel",
     "libcurl-devel",
@@ -102,6 +107,11 @@ license = "GPL-2.0-only AND LGPL-2.1-only"
 url = "https://qemu.org"
 source = f"https://download.qemu.org/qemu-{pkgver}.tar.xz"
 sha256 = "d0f4db0fbd151c0cf16f84aeb2a500f6e95009732546f44dafab8d2049bbb805"
+tool_flags = {
+    # see libbpf comment about bpf headers
+    "CFLAGS": ["-I/usr/include/bpf/uapi"],
+    "CXXFLAGS": ["-I/usr/include/bpf/uapi"],
+}
 file_modes = {
     "etc/qemu/bridge.conf": ("root", "_qemu", 0o640),
     "usr/libexec/qemu-bridge-helper": ("root", "_qemu", 0o4710),
@@ -126,10 +136,10 @@ def post_install(self):
     self.install_file(self.files_path / "bridge.conf", "etc/qemu")
 
     # no elf files in /usr/share
-    self.mv(self.destdir / "usr/share/qemu", self.destdir / "usr/lib/qemu")
+    self.rename("usr/share/qemu", "usr/lib/qemu", relative=False)
     self.install_link("usr/share/qemu", "../lib/qemu")
 
-    self.rm(self.destdir / "usr/share/doc", recursive=True)
+    self.uninstall("usr/share/doc")
 
 
 @subpackage("qemu-guest-agent")
@@ -190,6 +200,17 @@ def _vhost_user_gpu(self):
     ]
 
 
+@subpackage("qemu-edk2-firmware")
+def _firmware(self):
+    self.pkgdesc = "QEMU edk2 firmware files"
+    self.depends = []
+
+    return [
+        "usr/lib/qemu/firmware",
+        "usr/lib/qemu/edk2*",
+    ]
+
+
 def _spkg(sname):
     @subpackage(f"qemu-system-{sname}")
     def _system(self):
@@ -201,18 +222,13 @@ def _spkg(sname):
 
         match sname:
             case "aarch64":
-                extras = [
-                    "usr/lib/qemu/edk2-aarch64-code.fd",
-                    "usr/lib/qemu/firmware/60-edk2-aarch64.json",
-                ]
+                self.depends += [f"qemu-edk2-firmware={pkgver}-r{pkgrel}"]
             case "alpha":
                 extras = ["usr/lib/qemu/palcode-clipper"]
             case "arm":
+                self.depends += [f"qemu-edk2-firmware={pkgver}-r{pkgrel}"]
                 extras = [
-                    "usr/lib/qemu/edk2-arm-code.fd",
-                    "usr/lib/qemu/edk2-arm-vars.fd",
                     "usr/lib/qemu/npcm7xx_bootrom.bin",
-                    "usr/lib/qemu/firmware/60-edk2-arm.json",
                 ]
             case "hppa":
                 extras = [
@@ -221,13 +237,7 @@ def _spkg(sname):
                 ]
                 self.options += ["execstack"]
             case "i386":
-                extras = [
-                    "usr/lib/qemu/edk2-i386-code.fd",
-                    "usr/lib/qemu/edk2-i386-secure-code.fd",
-                    "usr/lib/qemu/edk2-i386-vars.fd",
-                    "usr/lib/qemu/firmware/50-edk2-i386-secure.json",
-                    "usr/lib/qemu/firmware/60-edk2-i386.json",
-                ]
+                self.depends += [f"qemu-edk2-firmware={pkgver}-r{pkgrel}"]
             case "ppc":
                 extras = [
                     "usr/lib/qemu/openbios-ppc",
@@ -260,12 +270,7 @@ def _spkg(sname):
                 ]
                 self.options += ["execstack"]
             case "x86_64":
-                extras = [
-                    "usr/lib/qemu/edk2-x86_64-code.fd",
-                    "usr/lib/qemu/edk2-x86_64-secure-code.fd",
-                    "usr/lib/qemu/firmware/50-edk2-x86_64-secure.json",
-                    "usr/lib/qemu/firmware/60-edk2-x86_64.json",
-                ]
+                self.depends += [f"qemu-edk2-firmware={pkgver}-r{pkgrel}"]
 
         # never strip them
         self.nostrip_files = extras

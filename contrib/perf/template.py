@@ -1,6 +1,6 @@
 pkgname = "perf"
-pkgver = "6.9.7"
-pkgrel = 1
+pkgver = "6.9.8"
+pkgrel = 0
 build_wrksrc = "tools/perf"
 build_style = "makefile"
 make_cmd = "gmake"
@@ -53,7 +53,7 @@ maintainer = "psykose <alice@ayaya.dev>"
 license = "GPL-2.0-only"
 url = "https://perf.wiki.kernel.org/index.php/Main_Page"
 source = f"https://cdn.kernel.org/pub/linux/kernel/v{pkgver[:pkgver.find('.')]}.x/linux-{pkgver}.tar.xz"
-sha256 = "e4f588cd91eef9d461e5e14fdf9415feff8a72fbcc274089a0f768a58de001f8"
+sha256 = "f048267b7b88316c9ca708c68d15a9ae802dcfc943c3188c1273eb958c433281"
 # nope
 # docs are a single tips file that gets displayed in the TUI
 options = ["!check", "!splitdoc"]
@@ -68,11 +68,11 @@ def init_build(self):
 
 def post_install(self):
     # relink hardlink
-    self.rm(self.destdir / "usr/bin/trace")
+    self.uninstall("usr/bin/trace")
     self.install_link("usr/bin/trace", "perf")
     # valid as both
-    self.rm(self.destdir / "etc/bash_completion.d", recursive=True)
+    self.uninstall("etc/bash_completion.d")
     self.install_completion("perf-completion.sh", "bash")
     self.install_completion("perf-completion.sh", "zsh")
     # pointless tests
-    self.rm(self.destdir / "usr/libexec/perf-core/tests", recursive=True)
+    self.uninstall("usr/libexec/perf-core/tests")

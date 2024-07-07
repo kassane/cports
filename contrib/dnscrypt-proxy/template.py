@@ -1,6 +1,6 @@
 pkgname = "dnscrypt-proxy"
 pkgver = "2.1.5"
-pkgrel = 4
+pkgrel = 5
 build_style = "go"
 hostmakedepends = ["go"]
 pkgdesc = "Tool for securing communications between a client and a DNS resolver"
@@ -14,8 +14,7 @@ options = ["!check"]
 
 
 def post_extract(self):
-    # FIXME: I can't get the included vendor path to work, weird dir layout?
-    # Remove and re-vendor.
+    # use our own
     self.rm("vendor", recursive=True)
 
 

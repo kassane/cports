@@ -1,6 +1,6 @@
 pkgname = "libvirt"
 pkgver = "10.5.0"
-pkgrel = 0
+pkgrel = 1
 build_style = "meson"
 configure_args = [
     "-Dattr=enabled",
@@ -34,6 +34,7 @@ configure_args = [
     "-Duserfaultfd_sysctl=disabled",
 ]
 hostmakedepends = [
+    "gettext",
     "libxml2-progs",
     "lvm2",  # buildtime check
     "meson",
@@ -87,7 +88,7 @@ sha256 = "8e853a9c91c9029b9019cf5fdf2b5fea36d501d563e43254efc20e12c00557e8"
 
 
 def post_install(self):
-    self.rm(self.destdir / "usr/lib/sysusers.d/libvirt-qemu.conf")
+    self.uninstall("usr/lib/sysusers.d/libvirt-qemu.conf")
     self.install_tmpfiles(self.files_path / "tmpfiles.conf")
     self.install_sysusers(self.files_path / "sysusers.conf")
 

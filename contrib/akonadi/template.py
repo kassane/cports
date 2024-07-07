@@ -1,5 +1,5 @@
 pkgname = "akonadi"
-pkgver = "24.05.1"
+pkgver = "24.05.2"
 pkgrel = 0
 build_style = "cmake"
 # TODO: add mariadb since it's usually the default
@@ -12,10 +12,11 @@ configure_args = [
 # collectionschedulertest: flaky
 # sqlite: all hang (?)
 # mysql: needs running mysql
-# last 5: random abort
 make_check_args = [
     "-E",
-    "(collectionschedulertest|entitytreemodeltest|mimetypecheckertest|.*sqlite.*|.*mysql.*|handlertest|partstreamertest|relationhandlertest|dbtypetest|parttypehelpertest)",
+    "(entitytreemodeltest|mimetypecheckertest|.*sqlite.*|.*mysql.*)",
+    # flaky
+    "-j1",
 ]
 make_check_wrapper = [
     "dbus-run-session",
@@ -54,7 +55,7 @@ maintainer = "Jami Kettunen <jami.kettunen@protonmail.com>"
 license = "LGPL-2.1-or-later"
 url = "https://userbase.kde.org/Akonadi"
 source = f"$(KDE_SITE)/release-service/{pkgver}/src/akonadi-{pkgver}.tar.xz"
-sha256 = "ea95d5def469efe5e4158aa6fb81e7c6d3fa19d272b6705473545429f41309cb"
+sha256 = "887966e46ce80c974ed27902531ffbf38cb621c6ad429e5576e5510da190fd79"
 tool_flags = {
     # disable debug mode
     "CXXFLAGS": ["-DNDEBUG"],

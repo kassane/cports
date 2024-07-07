@@ -16,15 +16,9 @@ options = ["!distlicense"]
 
 
 def post_install(self):
-    self.rm(self.destdir / "usr/bin", recursive=True)
+    self.uninstall("usr/bin")
 
 
 @subpackage("ijs-devel")
 def _devel(self):
-    # can't use default_devel, soname versioning is weird for this one
-    return [
-        "usr/include",
-        "usr/lib/libijs.so",
-        "usr/lib/libijs.a",
-        "usr/lib/pkgconfig",
-    ]
+    return self.default_devel()

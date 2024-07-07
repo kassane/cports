@@ -763,7 +763,7 @@ def bootstrap_update(tgt):
     from cbuild.core import chroot
 
     chroot.install()
-    chroot.remove_autodeps(False)
+    chroot.cleanup_world(False)
     chroot.update("main")
 
 
@@ -792,7 +792,7 @@ def do_clean(tgt):
 
     from cbuild.core import paths, errors, chroot
 
-    chroot.remove_autodeps(None)
+    chroot.cleanup_world(None)
     dirp = paths.builddir() / "builddir"
     if dirp.is_dir():
         shutil.rmtree(dirp)
@@ -819,7 +819,7 @@ def do_zap(tgt):
 def do_remove_autodeps(tgt):
     from cbuild.core import chroot
 
-    chroot.remove_autodeps(None)
+    chroot.cleanup_world(None)
 
 
 def do_prune_obsolete(tgt):
@@ -1691,10 +1691,10 @@ def do_pkg(tgt, pkgn=None, force=None, check=None, stage=None):
     if tgt == "chroot":
         paths.prepare()
         chroot.shell_update(not opt_nonet)
-        if rp and (rp.builddir / rp.wrksrc).is_dir():
-            curwrk = rp.chroot_builddir / rp.wrksrc
-        elif rp and rp.builddir.is_dir():
-            curwrk = rp.chroot_builddir
+        if rp and rp.srcdir.is_dir():
+            curwrk = rp.chroot_srcdir
+        elif rp and rp.srcdir.parent.is_dir():
+            curwrk = rp.chroot_srcdir.parent
         else:
             curwrk = None
         chroot.enter(

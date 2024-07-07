@@ -31,7 +31,6 @@ debug_level = 1  # make the debug size not explode
 tool_flags = {"LDFLAGS": ["-Wl,-z,stack-size=1048576"]}
 env = {
     "MACH_BUILD_PYTHON_NATIVE_PACKAGE_SOURCE": "system",
-    "MOZBUILD_STATE_PATH": f"/builddir/{pkgname}-{pkgver}/.mozbuild",
     "RUST_TARGET": self.profile().triplet,
     "RUSTFLAGS": "",  # our -Clink-arg breaks this build
     "PYTHON": "/usr/bin/python3.11",
@@ -51,6 +50,7 @@ options = ["!cross"]
 def init_configure(self):
     from cbuild.util import cargo
 
+    self.env["MOZBUILD_STATE_PATH"] = str(self.chroot_srcdir / ".mozbuild")
     self.env["AS"] = self.get_tool("CC")
     self.env["MOZ_MAKE_FLAGS"] = f"-j{self.make_jobs}"
     self.env["MOZ_OBJDIR"] = f"{self.chroot_cwd / 'objdir'}"
@@ -119,12 +119,9 @@ def do_install(self):
 
 
 def post_install(self):
-    self.rm(self.destdir / "usr/lib/libjs_static.ajs")
+    self.uninstall("usr/lib/libjs_static.ajs")
     # it has correct soname but not the right file name
-    self.mv(
-        self.destdir / "usr/lib/libmozjs-115.so",
-        self.destdir / "usr/lib/libmozjs-115.so.0",
-    )
+    self.rename("usr/lib/libmozjs-115.so", "libmozjs-115.so.0")
     self.install_link("usr/lib/libmozjs-115.so", "libmozjs-115.so.0")
 
 

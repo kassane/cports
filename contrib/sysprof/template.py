@@ -39,15 +39,9 @@ hardening = ["!int"]
 
 def post_install(self):
     self.install_service(self.files_path / "sysprof")
-    self.rm(self.destdir / "usr/systemd", recursive=True)
+    self.uninstall("usr/systemd")
 
 
 @subpackage("sysprof-devel")
 def _devel(self):
-    self.pkgdesc = f"{pkgdesc} (development files)"
-    return [
-        "usr/include",
-        "usr/lib/pkgconfig",
-        "usr/lib/libsysprof-6.so",
-        "usr/lib/*.a",
-    ]
+    return self.default_devel()

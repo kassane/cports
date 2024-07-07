@@ -39,26 +39,15 @@ sha256 = "ea3f3d8cfa2f6ae78c8722751d008f54bc17a3aed2be3f7399eb7bf5f4cda8f1"
 def post_install(self):
     self.install_service(self.files_path / "named")
     # get rid of hard links
-    self.rm(self.destdir / "usr/bin/named-compilezone")
-    self.rm(self.destdir / "usr/bin/ddns-confgen")
+    self.uninstall("usr/bin/named-compilezone")
+    self.uninstall("usr/bin/ddns-confgen")
     self.install_link("usr/bin/named-compilezone", "named-checkzone")
     self.install_link("usr/bin/ddns-confgen", "tsig-keygen")
 
 
 @subpackage("bind-devel")
 def _devel(self):
-    # shared libraries are versioned like libfoo-0.so, not libfoo.so.0,
-    # so glob patterns won't work
-    return [
-        "usr/include",
-        "usr/lib/libbind9.so",
-        "usr/lib/libdns.so",
-        "usr/lib/libirs.so",
-        "usr/lib/libisc.so",
-        "usr/lib/libisccc.so",
-        "usr/lib/libisccfg.so",
-        "usr/lib/libns.so",
-    ]
+    return self.default_devel()
 
 
 @subpackage("bind-progs")

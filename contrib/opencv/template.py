@@ -1,6 +1,6 @@
 pkgname = "opencv"
 pkgver = "4.10.0"
-pkgrel = 3
+pkgrel = 4
 build_style = "cmake"
 configure_args = [
     # rm NDEBUG
@@ -151,9 +151,7 @@ match self.profile().arch:
 def post_extract(self):
     # 'contrib' modules. by default all of them are built (from the repo),
     # so keep just whatever we want
-    for d in (
-        (self.builddir) / f"{self.wrksrc}" / "extra-modules" / "modules"
-    ).iterdir():
+    for d in (self.cwd / "extra-modules/modules").iterdir():
         if d.name not in [
             "alphamat",
             "aruco",
@@ -181,7 +179,7 @@ def post_extract(self):
 
 def init_configure(self):
     self.configure_args += [
-        f"-DOPENCV_EXTRA_MODULES_PATH={self.chroot_builddir}/{self.wrksrc}/extra-modules/modules",
+        f"-DOPENCV_EXTRA_MODULES_PATH={self.chroot_cwd}/extra-modules/modules",
     ]
 
 

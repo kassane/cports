@@ -182,6 +182,8 @@ targets may be promoted at a later point.
 
 **Untiered targets:**
 
+* `armhf`
+* `armv7`
 * `ppc`
 
 <a id="quality_requirements"></a>
@@ -504,10 +506,9 @@ influence repeated runs. The build system keeps track of the steps and
 upon successful completion, the step is not run again (e.g. when the
 build fails elsewhere and needs to be restarted).
 
-All build phases are run in either `self.wkrsrc` (all phases), or in
-`build_wrksrc` inside that directory (`configure` and later). The value
-of `self.wrksrc` is `{self.pkgname}-{self.pkgver}`. It exists within
-the `builddir` and is created automatically.
+All build phases are run in either `self.srcdir` (all phases), or in
+`build_wrksrc` inside that directory (`configure` and later); the `self.srcdir`
+is created automatically.
 
 * `setup` The build system prepares the environment. This means creating
   the necessary files and directories for the syndbox and installing the
@@ -527,18 +528,18 @@ the `builddir` and is created automatically.
 
 * `extract` All defined sources (which are not marked as skipped) are extracted.
   The builtin behavior runs inside of the sandbox, except when bootstrapping.
-  It populates the `self.wrksrc`. The `self.wrksrc` is not implied by sources.
+  It populates the `self.srcdir`. The `self.srcdir` is not implied by sources.
   Instead, it is created automatically, and all sources are extracted in it.
   When the extraction would result in a single directory being present inside
-  `self.wrksrc`, which is often the case (as the common scenario is having a
+  `self.srcdir`, which is often the case (as the common scenario is having a
   single source tarball and most tarballs don't have their files directly in
-  the root), the contents of the directory are moved into `self.wrksrc` and
+  the root), the contents of the directory are moved into `self.srcdir` and
   the leftover empty directory is removed. When `source_paths` is used and
   a source has a path that is not an empty string or `.`, it is extracted
   separately and is only moved into place after the moving logic is applied,
   while having the moving logic applied to itself as well. This simplifies
   various scenarios; for instance, one can have one tarball extract as if there
-  was only one source (i.e. its contents become `self.wrksrc`, including moving
+  was only one source (i.e. its contents become `self.srcdir`, including moving
   the contents if it contains a single directory) while having another tarball's
   contents become a subdirectory in the primary extracted tree, regardless of
   whether the secondary tarball has its files directly in root or whether it
@@ -776,7 +777,7 @@ Keep in mind that default values may be overridden by build styles.
    setting the brokenlinks option.
 * `build_style` *(str)* The build style used for the template. See the
   section about build styles for more details.
-* `build_wrksrc` *(str)* A subpath within `self.wrksrc` that is assumed to be
+* `build_wrksrc` *(str)* A subpath within `self.srcdir` that is assumed to be
   the current working directory during `configure` and later.
 * `checkdepends` *(list)* This is like `hostmakedepends`, but only installed
   if the `check` option is enabled for the template and not cross-building.
@@ -867,9 +868,9 @@ Keep in mind that default values may be overridden by build styles.
   be installed in the build container before building. These are always
   installed in the build container itself rather than target sysroot,
   even if cross compiling. Typically contains runnable tools. This is
+  not installed during stage 0 bootstrap, since they come from the host.
 * `ignore_shlibs` *(list)* A list of shared libraries (`NEEDED` values)
   to ignore in runtime dependency scan.
-  not installed during stage 0 bootstrap, since they come from the host.
 * `install_if` *(list)* A list of package names or version constraints that
   must be satisfied in order for this package to auto-install (i.e. if
   all packages in this list are installed, this one will also be installed).
@@ -2187,8 +2188,8 @@ API may specify additional custom environment variables, which further
 override the rest.
 
 The container is entered with a specific current working directory. At first
-this is `self.wrksrc`, then from `configure` onwards it may be `build_wrksrc`
-if set (which is inside `self.wrksrc`). This applies to all parts of each
+this is `self.srcdir`, then from `configure` onwards it may enter `build_wrksrc`
+if set (which is inside `self.srcdir`). This applies to all parts of each
 phase, including `init`, `pre` and `post`.
 
 The current working directory may be overridden locally via API, either for
@@ -2198,13 +2199,16 @@ The following bind mounts are provided:
 
 * `/` The root, read-only.
 * `/ccache` The `ccache` data path (`CCACHE_DIR`), read-write.
-* `/builddir` The directory in which `self.wrksrc` exists.
+* `/builddir` The directory in which `self.srcdir` exists.
 * `/destdir` The destination directory for installing; packages will
   install into `/destdir/pkgname-pkgver`, or when cross compiling,
   into `/destdir/triplet/pkgname-pkgver`. Read only before `install`,
   and read-write for the `install` phase.
 * `/sources` Read-only, points to where all sources are stored.
 * `/dev`, `/proc` and `/tmp` are fresh (not bound).
+
+The bind mount names are not guaranteed so templates are not supposed to
+rely on them; use the proper variables.
 
 Once the `fetch` phase is done, all possible namespaces are unshared.
 This includes the network namespace, so there is no more network
@@ -2447,7 +2451,8 @@ Shared API for both templates and subpackages.
 All APIs may raise errors. The user is not supposed to handle the errors,
 they will be handled appropriately by `cbuild`.
 
-Filesystem APIs take strings or `pathlib` paths.
+Filesystem APIs take strings or `pathlib` paths. They also allow the special
+prefix `>/` in the path as a shorthand for `self.destdir`.
 
 ##### self.pkgname
 
@@ -2520,6 +2525,10 @@ Same as `destdir`, but when viewed from inside the sandbox.
 The absolute path to the directory (stored within `builddir`) which
 contains all the state files (i.e. tracking which phases are done and
 so on in a persistent manner to allow resuming, plus any wrappers).
+
+##### self.chroot_statedir
+
+Same as `statedir`, but when viewed from inside the sandbox.
 
 ##### def log(self, msg, end = "\n")
 
@@ -2740,12 +2749,6 @@ Whether using `ccache` is enabled by `cbuild`.
 
 Whether using `sccache` is enabled by `cbuild`.
 
-##### self.wrksrc
-
-A string representing the name of the directory inside `builddir` that
-is used as the default working source. It is usually the basis for `self.cwd`,
-along with the potential user-set `build_wrksrc` meta variable.
-
 ##### self.cwd
 
 The current working directory of the template. This does not mirror the
@@ -2785,14 +2788,14 @@ Like `self.sources_path`, but within the sandbox for in-chroot operations.
 
 The absolute path to the `bldroot`.
 
-##### self.builddir
+##### self.srcdir
 
-The absolute path to the `builddir`. This directory is where sources are
-extracted, and which is used as the mutable base for builds.
+The absolute path to extracted source root, without accounting for things
+like `build_wrksrc`.
 
-##### self.chroot_builddir
+##### self.chroot_srcdir
 
-Like `builddir`, but when viewed from inside the sandbox.
+Like `srcdir`, but when viewed from inside the sandbox.
 
 ##### self.wrapperdir
 
@@ -3088,6 +3091,28 @@ Usage:
 self.install_shell("/usr/bin/bash")
 ```
 
+##### def uninstall(self, path, glob = False)
+
+Wipes the `path` (which must be a relative string) from the destination
+directory. The path must match some files or directories. It can optionally
+be globbed.
+
+##### def rename(self, src, dest, relative = True, glob = False, keep_name = False)
+
+Renames the `src` path (which must be a relative string) in the destination
+directory to `dest`. The `dest` can be a relative path too. When `relative`
+is true, something like `self.rename("foo/bar", "baz")` will make a `foo/baz`
+while `self.rename("foo/bar", "bar/baz")` will make `foo/bar/baz`. When
+it's false, the `dest` is treated as a separate new path within `destdir`,
+so `self.rename("foo/bar", "bar/baz")` will make a `bar/baz`.
+
+When `glob` is enabled, the `src` will be globbed beforehand and it must
+return exactly one result. This is useful for fuzzy matches.
+
+When `keep_name` is set, the original source name will be appended to the
+final destination path, i.e. `self.rename("foo/bar", "baz", keep_name=True)`
+becomes `foo/baz/bar`.
+
 <a id="class_subpackage"></a>
 #### Subpackage Class
 
@@ -3131,6 +3156,10 @@ def _subpkg(self):
 This function will `take` everything that should usually belong in a
 development package. See the implementation in `cbuild/core/template.py`
 for the current coverage.
+
+Note that its handling of `.so` files in `/usr/lib` is a bit special; it will
+only take symlinks, and files that are not ELF (in order to cover linker
+scripts). Actual ELF files with raw `.so` suffix are skipped.
 
 If `man` is a non-empty string, it represents the manpage categories to take.
 
@@ -3493,7 +3522,7 @@ The environment for the invocation works as follows:
 The combined environment is passed to `self.template.do()`.
 
 The `wrksrc` is either the `wrksrc` argument, `self.wrksrc`, or
-`self.template.wrksrc` in that order (the first that is set is used).
+`self.template.make_dir` in that order (the first that is set is used).
 
 You can use this method as a completely generic, unspecialized invocation.
 

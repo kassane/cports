@@ -1,6 +1,6 @@
 pkgname = "go"
-pkgver = "1.22.4"
-pkgrel = 0
+pkgver = "1.22.5"
+pkgrel = 1
 hostmakedepends = ["bash"]
 checkdepends = [
     "libatomic-chimera-devel-static",
@@ -12,7 +12,7 @@ maintainer = "q66 <q66@chimera-linux.org>"
 license = "BSD-3-Clause"
 url = "https://go.dev"
 source = f"{url}/dl/go{pkgver}.src.tar.gz"
-sha256 = "fed720678e728a7ca30ba8d1ded1caafe27d16028fab0232b8ba8e22008fb784"
+sha256 = "ac9c723f224969aee624bc34fd34c9e13f2a212d75c71c807de644bb46e112f6"
 env = {}
 # a bunch of tests fail for now, so FIXME
 options = [
@@ -76,10 +76,16 @@ def _get_binpath(self):
 
 def _clear_pkg(self, arch, ppath):
     if arch:
-        self.rm(ppath / f"tool/linux_{arch}", recursive=True)
-        self.rm(ppath / f"linux_{arch}", recursive=True)
-    for f in (ppath / "tool").iterdir():
+        self.rm(ppath / f"pkg/tool/linux_{arch}", recursive=True)
+        self.rm(ppath / f"pkg/linux_{arch}", recursive=True)
+    for f in (ppath / "pkg/tool").iterdir():
         self.rm(f / "api", force=True)
+
+    # cleanup useless testdata
+    for f in (ppath / "src").rglob("testdata"):
+        self.rm(f, recursive=True)
+    for f in (ppath / "src").rglob("*_test.go"):
+        self.rm(f)
 
 
 @custom_target("bootstrap", "build")
@@ -124,4 +130,4 @@ def do_install(self):
 
     self.install_license("LICENSE")
 
-    _clear_pkg(self, _hostarch, self.destdir / "usr/lib/go/pkg")
+    _clear_pkg(self, _hostarch, self.destdir / "usr/lib/go")

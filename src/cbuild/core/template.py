@@ -236,12 +236,17 @@ def call_pkg_hooks(pkg, stepn):
 
 
 def _pglob_path(oldp, patp):
-    oldp = pathlib.Path(oldp)
-    patp = pathlib.Path(patp)
     if patp.is_absolute():
         rootp = pathlib.Path("/")
         return list(rootp.glob(str(patp.relative_to(rootp))))
     return list(oldp.glob(str(patp)))
+
+
+def _subst_path(pkg, pathn):
+    if isinstance(pathn, str) and pathn.startswith(">/"):
+        return pkg.destdir / pathn.removeprefix(">/")
+    else:
+        return pathlib.Path(pathn)
 
 
 class Package:
@@ -283,14 +288,14 @@ class Package:
         old_cpath = self.rparent.chroot_cwd
 
         if glob:
-            new_paths = _pglob_path(old_path, dirn)
+            new_paths = _pglob_path(old_path, _subst_path(self, dirn))
             if len(new_paths) != 1:
                 self.error(
                     f"path '{dirn}' must match exactly one directory", bt=True
                 )
             new_path = new_paths[0]
         else:
-            new_path = old_path / dirn
+            new_path = old_path / _subst_path(self, dirn)
 
         if not new_path.is_dir():
             self.error(f"path '{new_path}' is not a directory", bt=True)
@@ -309,6 +314,9 @@ class Package:
             self.rparent.chroot_cwd = old_cpath
 
     def cp(self, srcp, destp, recursive=False, symlinks=True, glob=False):
+        srcp = _subst_path(self, srcp)
+        destp = _subst_path(self, destp)
+
         if not glob:
             srcs = [self.rparent.cwd / srcp]
         else:
@@ -339,7 +347,8 @@ class Package:
         return pathlib.Path(ret)
 
     def mv(self, srcp, destp, glob=False):
-        destp = self.rparent.cwd / destp
+        srcp = _subst_path(self, srcp)
+        destp = self.rparent.cwd / _subst_path(self, destp)
         if not glob:
             return pathlib.Path(shutil.move(self.rparent.cwd / srcp, destp))
 
@@ -354,9 +363,13 @@ class Package:
         return ret
 
     def mkdir(self, path, parents=False):
-        (self.rparent.cwd / path).mkdir(parents=parents, exist_ok=parents)
+        (self.rparent.cwd / _subst_path(self, path)).mkdir(
+            parents=parents, exist_ok=parents
+        )
 
     def rm(self, path, recursive=False, force=False, glob=False):
+        path = _subst_path(self, path)
+
         if not glob:
             paths = [self.rparent.cwd / path]
         else:
@@ -376,15 +389,20 @@ class Package:
                     f(p)
 
                 if force and not path.exists():
-                    return
+                    do_unl = path.is_symlink()
+                    if not do_unl:
+                        return
+                else:
+                    do_unl = not path.is_dir() or path.is_symlink()
 
-                if not path.is_dir() or path.is_symlink():
+                if do_unl:
                     path.unlink(missing_ok=force)
                 else:
                     shutil.rmtree(path, onerror=_remove_ro)
 
     def ln_s(self, srcp, destp, relative=False):
-        destp = self.rparent.cwd / destp
+        srcp = _subst_path(self, srcp)
+        destp = _subst_path(self, destp)
         if destp.is_dir():
             destp = destp / pathlib.Path(srcp).name
         if relative:
@@ -392,17 +410,21 @@ class Package:
         destp.symlink_to(srcp)
 
     def chmod(self, path, mode):
-        (self.rparent.cwd / path).chmod(mode)
+        (self.rparent.cwd / _subst_path(self, path)).chmod(mode)
 
     def touch_epoch(self, path):
         ts = self.rparent.source_date_epoch
         if not ts:
             return
         self.log(f"normalizing timestamp for {path}...")
-        os.utime(self.rparent.cwd / path, (ts, ts), follow_symlinks=False)
+        os.utime(
+            self.rparent.cwd / _subst_path(self, path),
+            (ts, ts),
+            follow_symlinks=False,
+        )
 
     def find(self, path, pattern, files=False):
-        path = pathlib.Path(path)
+        path = _subst_path(self, path)
         if path.is_absolute():
             for fn in path.rglob(pattern):
                 if not files or fn.is_file():
@@ -1266,8 +1288,8 @@ class Template(Package):
 
         fakestrip = self.wrapperdir / "strip"
         if self.stage > 0:
-            fakestrip = pathlib.Path("/builddir") / fakestrip.relative_to(
-                self.builddir
+            fakestrip = self.chroot_statedir / fakestrip.relative_to(
+                self.statedir
             )
 
         cenv["STRIPBIN"] = str(fakestrip)
@@ -1492,8 +1514,51 @@ class Template(Package):
             return self._current_profile
         return self._profile(target)
 
+    def uninstall(self, path, glob=False):
+        if path.startswith("/"):
+            raise errors.TracebackException(
+                f"uninstall: path '{path}' must not be absolute"
+            )
+        if not glob:
+            dests = [self.destdir / path]
+            if not dests[0].exists() and not dests[0].is_symlink():
+                self.error(f"path '{path}' does not match anything", bt=True)
+        else:
+            dests = list(self.destdir.glob(path))
+            if len(dests) < 1:
+                self.error(f"path '{path}' does not match anything", bt=True)
+        for dst in dests:
+            self.rm(dst, recursive=True, force=True)
+
+    def rename(self, src, dest, relative=True, glob=False, keep_name=False):
+        if src.startswith("/"):
+            raise errors.TracebackException(
+                f"uninstall: path '{src}' must not be absolute"
+            )
+        if dest.startswith("/"):
+            raise errors.TracebackException(
+                f"uninstall: path '{dest}' must not be absolute"
+            )
+        if glob:
+            tsrc = list(self.destdir.glob(src))
+            if len(tsrc) != 1:
+                self.error(f"rename glob '{src}' must match one result")
+            src = tsrc[0]
+        else:
+            src = self.destdir / src
+        if relative:
+            dest = (src.resolve(True).parent / dest).resolve()
+        else:
+            dest = (self.destdir / dest).resolve()
+        if keep_name:
+            dest.mkdir(parents=True, exist_ok=True)
+            src.rename(dest / src.name)
+        else:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            src.rename(dest)
+
     def install_files(self, path, dest, symlinks=True, name=None):
-        path = pathlib.Path(path)
+        path = _subst_path(self, path)
         dest = pathlib.Path(dest)
         if dest.is_absolute():
             raise errors.TracebackException(
@@ -1894,7 +1959,27 @@ class Subpackage(Package):
             if f.name != "pkg-config":
                 self.take(f"usr/bin/{f.name}")
         self.take("usr/lib/*.a", missing_ok=True)
-        self.take("usr/lib/*.so", missing_ok=True)
+        # .so files are a bit special
+        # we have no mechanism for bypassing errors for the special case,
+        # but it's always wrong to devel actual ELF files, so the warning
+        # is just in case (for linker scripts, it breaks dep tracer, but
+        # can we do anything about that?)
+        for f in (self.parent.destdir / "usr/lib").glob("*.so"):
+            if f.is_symlink():
+                self.take(f"usr/lib/{f.name}")
+                continue
+            # check if ELF
+            with open(f, "rb") as sof:
+                if sof.read(4) == b"\x7fELF":
+                    self.log_warn(
+                        f"{f}: unsuffixed ELF .so encountered, skipping for devel"
+                    )
+                    continue
+            # otherwise maybe a linker script? take it
+            self.log_warn(
+                f"{f}: unsuffixed non-ELF .so encountered, linker script? (check dependencies)"
+            )
+            self.take(f"usr/lib/{f.name}")
         self.take("usr/lib/pkgconfig", missing_ok=True)
         self.take("usr/lib/cmake", missing_ok=True)
         self.take("usr/lib/glade/modules", missing_ok=True)
@@ -2073,7 +2158,6 @@ def from_module(m, ret):
             ropts[opt] = not neg
 
     ret.options = ropts
-    ret.wrksrc = f"{ret.pkgname}-{ret.pkgver}"
 
     if ret.provider_priority < 0:
         ret.error("provider_priority must be positive")
@@ -2127,13 +2211,15 @@ def from_module(m, ret):
         if hasattr(m, "post_" + phase):
             setattr(ret, "post_" + phase, getattr(m, "post_" + phase))
 
+    bdirbase = paths.builddir() / "builddir"
+    cbdirbase = pathlib.Path("/builddir")
+
     # paths that can be used by template methods
     ret.files_path = ret.template_path / "files"
     ret.patches_path = ret.template_path / "patches"
     ret.sources_path = paths.sources() / f"{ret.pkgname}-{ret.pkgver}"
     ret.bldroot_path = paths.bldroot()
-    ret.builddir = paths.builddir() / "builddir"
-    ret.statedir = ret.builddir / (".cbuild-" + ret.pkgname)
+    ret.statedir = bdirbase / (".cbuild-" + ret.pkgname)
     ret.wrapperdir = ret.statedir / "wrappers"
 
     if ret.profile().cross:
@@ -2143,18 +2229,19 @@ def from_module(m, ret):
 
     ret.destdir = ret.destdir_base / f"{ret.pkgname}-{ret.pkgver}"
 
-    ret.cwd = ret.builddir / ret.wrksrc / ret.build_wrksrc
+    ret.srcdir = bdirbase / f"{ret.pkgname}-{ret.pkgver}"
+    ret.cwd = ret.srcdir / ret.build_wrksrc
 
     if ret.stage == 0:
         ret.chroot_cwd = ret.cwd
-        ret.chroot_builddir = ret.builddir
+        ret.chroot_srcdir = ret.srcdir
+        ret.chroot_statedir = ret.statedir
         ret.chroot_destdir_base = ret.destdir_base
         ret.chroot_sources_path = ret.sources_path
     else:
-        ret.chroot_cwd = pathlib.Path("/builddir") / ret.cwd.relative_to(
-            ret.builddir
-        )
-        ret.chroot_builddir = pathlib.Path("/builddir")
+        ret.chroot_cwd = cbdirbase / ret.cwd.relative_to(bdirbase)
+        ret.chroot_srcdir = cbdirbase / ret.srcdir.relative_to(bdirbase)
+        ret.chroot_statedir = cbdirbase / ret.statedir.relative_to(bdirbase)
         ret.chroot_destdir_base = pathlib.Path("/destdir")
         ret.chroot_sources_path = (
             pathlib.Path("/sources") / f"{ret.pkgname}-{ret.pkgver}"
